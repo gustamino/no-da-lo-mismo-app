@@ -74,7 +74,7 @@ body[data-mode="dia"]{--bg:#f5f7fb;--paper:#ffffff;--paper2:#eef3fb;--paper3:#df
         <h2 style="font-family:var(--font-title);font-size:1.7rem">🏆 Informe del dilema</h2>
         <p class="reading" id="resultText">Recorrido completado.</p>
         <div class="stats"><div class="stat"><b id="finalScore">0</b><span>Puntos</span></div><div class="stat"><b id="finalTime">00:00</b><span>Tiempo</span></div><div class="stat"><b id="finalDone">0/8</b><span>Misiones</span></div><div class="stat"><b>TXT</b><span>Respaldo</span></div></div>
-        <div class="delivery-box"><p class="mini-title">Entrega</p><ol class="delivery-steps"><li>Escriban el email que les dio el profesor.</li><li>Toquen <b>Copiar informe</b>.</li><li>Toquen <b>Abrir email</b>. Se abrirá Gmail, Outlook o la app de correo configurada con destinatario y asunto.</li><li>El informe completo queda copiado automáticamente: péguenlo en el cuerpo del mensaje y envíenlo. Como respaldo, descarguen el archivo TXT.</li></ol></div>
+        <div class="delivery-box"><p class="mini-title">Entrega</p><ol class="delivery-steps"><li>Escriban el email que les dio el profesor.</li><li>Toquen <b>Copiar informe</b>.</li><li>Toquen <b>Abrir email</b>. Abajo aparecerá un panel con el informe, el destinatario y botones para Gmail, Outlook o correo del dispositivo.</li><li>Copien el informe, péguenlo en el cuerpo del correo y envíenlo. Como respaldo, descarguen el archivo TXT.</li></ol></div>
         <div class="setup-grid" style="margin-top:12px"><div class="full"><label class="label">Email de destino</label><input id="teacherEmailFinal" type="email" placeholder="profesor@colegio.edu.ar"></div></div>
         <div class="tools" style="justify-content:center"><button class="btn" id="copyReport">📋 Copiar informe</button><button class="btn secondary" id="downloadReport">⬇️ Descargar TXT</button><button class="btn good" id="emailReport">✉️ Abrir email</button><button class="btn ghost" id="chooseAnother">Elegir otro dilema</button></div>
       </section>
@@ -152,7 +152,7 @@ function emailReport(){
   const to=(finalInput?.value||state.teacherEmail||mainInput?.value||'').trim();
 
   if(!to){
-    showToast('Escriban el email de destino antes de abrir el correo');
+    showToast('Escriban el email de destino antes de preparar el envío');
     if(finalInput) finalInput.focus();
     return;
   }
@@ -163,21 +163,67 @@ function emailReport(){
   save();
 
   const subject='Informe NO DA LO MISMO · '+currentDilemma().title;
-  const fullReport=buildReport();
+  const report=buildReport();
 
-  // Gmail web estaba abriendo una ventana deformada y ocultaba el botón Enviar.
-  // Por eso ya NO se abre Gmail por URL. Se usa mailto, que abre la app de correo normal.
   try{
-    navigator.clipboard?.writeText(fullReport);
-    showToast('Informe copiado. Pegalo en el cuerpo del correo y enviá.');
+    navigator.clipboard?.writeText(report);
+    showToast('Informe copiado. Pegalo en el correo antes de enviar.');
   }catch(e){
-    showToast('Abrimos el correo. Si hace falta, usá Copiar informe.');
+    showToast('Si no se copió automáticamente, tocá Copiar informe.');
   }
 
+  let panel=$('#emailSendPanel');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='emailSendPanel';
+    panel.className='content-card';
+    panel.style.marginTop='14px';
+    panel.innerHTML=
+      '<p class="mini-title">Preparar envío por email</p>'+
+      '<p class="reading">El informe queda abajo para copiar y pegar. Usá el botón que corresponda según el correo que tengas abierto en tu dispositivo.</p>'+
+      '<div class="setup-grid" style="margin-top:12px">'+
+        '<div><label class="label">Email de destino</label><input id="emailPanelTo" type="email"></div>'+
+        '<div><label class="label">Asunto</label><input id="emailPanelSubject" type="text"></div>'+
+        '<div class="full"><label class="label">Informe completo</label><textarea id="emailPanelReport" style="min-height:260px"></textarea></div>'+
+      '</div>'+
+      '<div class="tools" style="justify-content:center;margin-top:12px">'+
+        '<button class="btn" id="emailPanelCopy" type="button">📋 Copiar informe</button>'+
+        '<a class="btn secondary" id="emailPanelGmail" target="_blank" rel="noopener">Abrir Gmail</a>'+
+        '<a class="btn secondary" id="emailPanelOutlook" target="_blank" rel="noopener">Abrir Outlook</a>'+
+        '<a class="btn ghost" id="emailPanelMailto">Abrir correo del dispositivo</a>'+
+      '</div>'+
+      '<p class="hint" style="margin-top:10px">Paso final: pegá el informe en el cuerpo del correo y tocá Enviar. Si Gmail no abre desde tu navegador, usá “Abrir correo del dispositivo”.</p>';
+    const resultPanel=$('#resultPanel') || $('#result') || document.body;
+    resultPanel.appendChild(panel);
+  }
+
+  $('#emailPanelTo').value=to;
+  $('#emailPanelSubject').value=subject;
+  $('#emailPanelReport').value=report;
+
+  const gmailUrl='https://mail.google.com/mail/?view=cm&fs=1&to='+
+    encodeURIComponent(to)+'&su='+encodeURIComponent(subject);
+  const outlookUrl='https://outlook.live.com/mail/0/deeplink/compose?to='+
+    encodeURIComponent(to)+'&subject='+encodeURIComponent(subject);
   const mailtoUrl='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subject);
 
-  // Usamos una acción directa para que el celular/computadora abra Gmail, Outlook o el cliente configurado.
-  window.location.href=mailtoUrl;
+  $('#emailPanelGmail').setAttribute('href',gmailUrl);
+  $('#emailPanelOutlook').setAttribute('href',outlookUrl);
+  $('#emailPanelMailto').setAttribute('href',mailtoUrl);
+
+  $('#emailPanelCopy').onclick=async()=>{
+    const text=$('#emailPanelReport').value;
+    try{
+      await navigator.clipboard.writeText(text);
+      showToast('Informe copiado. Pegalo en el correo.');
+    }catch(e){
+      $('#emailPanelReport').focus();
+      $('#emailPanelReport').select();
+      showToast('Texto seleccionado. Copialo manualmente.');
+    }
+  };
+
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderFavorites(){const box=$('#favList');const favs=DILEMMAS.filter(d=>state.favorites.includes(d.id));box.innerHTML=favs.length?favs.map(d=>`<p class="reading" style="margin-bottom:8px">⭐ ${esc(d.title)}</p>`).join(''):'<p class="reading">Todavía no marcaron dilemas favoritos.</p>'}
 function closeDrawers(){$$('.drawer').forEach(d=>d.classList.remove('open'))}
